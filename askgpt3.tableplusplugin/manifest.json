@@ -1,0 +1,22 @@
+{
+    "name": "Ask GPT-3",
+    "identifier": "com.hormold.askgpt3",
+    "version": "1.0",
+    "detail": "Parse SQL and talk with GPT-3 about it like in ChatGPT",
+    "author": "Hormold",
+    "site": "https://github.com/Hormold/askgpt3",
+    "email": "hormold@gmail.com",
+    "scripts": [
+        {
+            "location": "item",
+            "type": "separator"
+        },
+        {
+            "name": "Ask GPT-3",
+            "location": "item",
+            "type": "action",
+            "script": "gpt.js",
+            "handler": "creation"
+        }
+    ]
+}

@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<title>GPT SQL Query</title>
+	<!-- Bootstrap CDN -->
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+	<!-- jQuery CDN -->
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+	<!-- Bootstrap JS CDN -->
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+	<!-- Custom CSS -->
+	<style>
+		.container {
+			margin-top: 10px;
+		}
+		ul {
+			list-style-type: none;
+			padding: 10px;
+		}
+		input[type=checkbox] {
+			margin-right: 5px;
+		}
+		.fork-me {
+			position: absolute;
+			top: 0;
+			right: 0;
+		}
+	</style>
+	<!-- Vue -->
+	<script src="https://unpkg.com/vue@2.7.14/dist/vue.js"></script>
+</head>
+
+<body>
+	<div id="app">
+		<div class="container">
+			<div class="row">
+
+				<div class="col-md-8 col-md-offset-2" v-if="view === 'setkey'">
+					<div class="panel panel-default">
+						<div class="panel-heading">
+							<h3 class="panel-title">Set OpenAI Token</h3>
+						</div>
+						<div class="panel-body">
+							<div class="alert alert-warning" role="alert" v-if="sql_error">
+								<b>Error:</b> [[sql_error]]
+							</div>
+							<p>Please enter your OpenAI API token below and it will be saved to browser localStorage</p>
+							<fieldset>
+								<div class="form-group">
+									<input class="form-control" v-model="key" placeholder="Enter OpenAI API token"
+										name="key" type="text">
+								</div>
+								<div>
+									<input class="btn btn-lg btn-success btn-block" type="submit" value="Save to localStorage and continue"
+										@click="setKey">
+								</div>
+							</fieldset>
+						</div>
+						<div class="panel-footer">
+							<span class="text-muted">You can get your OpenAI API token <a href="https://beta.openai.com/account/api-keys" target="_blank">here</a>.</span>
+						</div>
+					</div>
+				</div>
+
+				<div class="col-md-8 col-md-offset-2" v-if="view === 'index'">
+					<div class="panel panel-default">
+						<div class="panel-heading">
+							<h3 class="panel-title">GPT SQL Query: Configuation ([[ driver ]], [[status]])</h3>
+						</div>
+						<div class="panel-body">
+							<div class="alert alert-warning" role="alert" v-if="sql_error">
+								<b>Error:</b> [[sql_error]]
+							</div>
+
+							<fieldset>
+								<div class="form-group">
+									<textarea class="form-control" v-model="query" placeholder="Enter text request to generate SQL query"
+										rows="5"
+										name="query" type="text"></textarea>
+								</div>
+								<!-- slider with temperature edit from 0.1 to 1 -->
+								<div class="form-group">
+									<label for="temp">OpenAI Query Temperature ([[temp]])*:</label>
+									<input type="range" class="form-control-range" name="temp" id="temp" min="0.1"
+										v-model="temp" max="1" step="0.1" value="0.5">
+								</div>
+								<div v-if="!isLoading">
+									<div class="row">
+										<div class="col-md-6">
+											<input class="btn btn-lg btn-success btn-block" type="submit" value="Do Magic!" @click="generate">
+										</div>
+										<div class="col-md-6">
+											<input class="btn btn-lg btn-success btn-block" type="submit" value="I don't know what to ask" @click="generateRandom">
+										</div>
+									</div>
+									
+								</div>
+								<div v-else>
+									<button class="btn btn-lg btn-success btn-block" type="button" disabled>
+										<span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+										Loading...
+									</button>
+								</div>
+							</fieldset>
+							<!-- small prompt  -->
+							<div class="panel-footer" style="margin-top: 20px; border-radius: 5px;">
+								<p>SQL Strucutre (select tables to use to generate query):</p>
+								<small class="text-muted">
+									<!-- each  -->
+									<ul>
+									<li v-for="(item, key) in schema" v-if="item.length > 0">
+										<input
+											type="checkbox"
+											v-model="schema[key].selected"
+											:value="key"
+											:id="key"
+											:name="key"
+											@change="updateSchema(key)">
+										<label :for="key">
+											<b>[[key]]:</b> [[item.map( r=> r.name).join(", ")]]
+										</label>
+									</li>
+									</ul>
+									<button type="button" class="btn btn-default btn-sm" @click="selectAll">
+										<span class="glyphicon glyphicon-check"></span> Select All
+									</button>
+									<button type="button" class="btn btn-default btn-sm" @click="deselectAll">
+										<span class="glyphicon glyphicon-unchecked"></span> Deselect All
+									</button>
+								</small>
+							</div>
+						</div>
+						<div class="panel-footer">
+							<small class="text-muted">Adjusting OpenAI temperature will change the randomness of the generated
+								query. Higher temperature will generate more random queries, while lower temperature will
+								generate more predictable queries. Using the huge number of tables can increase the cost of query.</small>
+						</div>
+					</div>
+				</div>
+
+				<div class="col-md-8 col-md-offset-2" v-if="view === 'generate'">
+					<div class="panel panel-default">
+						<div class="panel-heading">
+							<div class="pull-right">
+								<button type="button" class="btn btn-default btn-sm" @click="view = 'index'">
+									<span class="glyphicon glyphicon-arrow-left"></span> Back
+								</button>
+							</div>
+							<h3 class="panel-title">Approve generate SQL query<br /><br /></h3>
+							<!-- Back button -->
+							
+							
+						</div>
+
+						<div class="panel-body">
+							<div class="alert alert-warning" role="alert" v-if="sql_error">
+								<b>Error in generated query:</b> [[sql_error]]
+							</div>
+							<fieldset>
+								<div class="form-group">
+									<textarea
+										class="form-control"
+										name="query"
+										type="text" 
+										cols="80"
+										rows="12"
+										v-model="sql_query">
+									</textarea>
+								</div>
+								<div v-if="!isLoading">
+									<div class="row">
+										<div class="col-md-6">
+											<input class="btn btn-lg btn-success btn-block" type="submit" :value="'Regenerate (~' + (used_tokens) + ' tokens)'"
+												@click="generate">
+										</div>
+										<div class="col-md-6">
+											<input class="btn btn-lg btn-success btn-block" type="submit" value="Go back"
+												@click="view = 'index'">
+										</div>
+									</div>
+								</div>
+								<div v-else>
+									<button class="btn btn-lg btn-success btn-block" type="button" disabled>
+										<span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+										Loading...
+									</button>
+								</div>
+							</fieldset>
+						</div>
+						<div class="panel-footer">
+							<small class="text-muted">Disclaimer: SQL is generated by OpenAI GPT-3. Please review the
+								query before running. Query can be invalid.</small>
+						</div>
+					</div>
+				</div>
+			</div>
+			
+		</div>
+	</div>
+
+	<!-- Vue -->
+	<script lang="javascript">
+		var app = new Vue({
+			el: '#app',
+			delimiters: ['[[', ']]'],
+			data: {
+				status: 'wtf',
+				driver: 'unknown engine',
+				hasOpenAIKey: 'False',
+				sql_schema: '',
+				in_schema: {},
+				sql_query: '',
+				view: 'index',
+				temp: 0.5,
+				query: '',
+				column_names: [],
+				results: [],
+				isLoading: false,
+				seconds_elapsed: 0,
+				used_tokens: 0,
+				key: '',
+				sql_error: null,
+				chart_type: 'bar',
+				chart_data: [],
+
+				debug: null,
+			},
+
+			created() {
+				if(localStorage.getItem('openai_key'))
+					this.key = localStorage.getItem('openai_key')
+				if(this.hasOpenAIKey === 'False' && !this.key)
+					this.view = 'setkey'
+			},
+
+			watch: {
+				in_schema: function (val) {
+					this.status = 'ready'
+					this.schema = val
+					// this.debug = val;
+				},
+			},
+
+			methods: {
+
+				inited: function () {
+					this.schema = this.in_schema
+					for (var key in this.schema) {
+						if (localStorage.getItem(key) === 'true') {
+							this.schema[key].selected = true;
+						} else {
+							this.schema[key].selected = false;
+						}
+					}
+					this.status = 'ready';
+					this.$forceUpdate();
+				},
+
+				getTablesString: function (selectedTables) {
+					let result = '';
+					for(let tableName in this.schema) {
+						if(!selectedTables.includes(tableName)) continue;
+						result += `\n\nTable "${tableName}" has columns: `;
+						for(let col of this.schema[tableName]) {
+							result += `\n\t${col.name} (${col.type}${col.comment ? ` - ${col.comment}` : ''}})`;
+						}
+						result += `\n\n`;
+					}
+					return result;
+				},
+
+				generateSchema: function (instructions, selectedTables) {
+					let result = `Given an input question, respond with syntactically correct ${this.driver} query. Be creative but the SQL must be correct, not nessesary to use all tables. 
+Schema: `;
+					result += this.getTablesString(selectedTables);
+					result += `\n\nInstructions: ${instructions}\n\nSQL:`;
+					return result;
+				},
+
+				generateSchemaIDK: function (selectedTables) {
+					let result = `Your task is create creative prompt, using this scheme of ${this.driver} database: `;
+					result += this.getTablesString(selectedTables);
+					result += `\nGenerate a prompt for database data extract, not project description.\nDo not generate SQL query, generate text based prompt.\nResult: \n`;
+					return result;
+				},
+
+				setKey: function () {
+					this.sql_error = null;
+					if(!this.key.match(/^sk-([a-zA-Z0-9]{1,64})$/)) {
+						this.sql_error = 'Invalid key, it should be in the format sk-[a-zA-Z0-9]{32}';
+						return;
+					}
+					this.view = 'index';
+					localStorage.setItem('openai_key', this.key);
+				},
+
+				updateSchema: function (key) {
+					// save to localStorage
+					localStorage.setItem(key, this.schema[key].selected);
+					// Rerender
+					this.$forceUpdate();
+				},
+
+				selectAll: function () {
+					for (var key in this.schema) {
+						this.schema[key].selected = true;
+						localStorage.setItem(key, this.schema[key].selected);
+					}
+					this.$forceUpdate();
+				},
+
+				deselectAll: function () {
+					for (var key in this.schema) {
+						this.schema[key].selected = false;
+						localStorage.setItem(key, this.schema[key].selected);
+					}
+					this.$forceUpdate();
+				},
+
+				generateRandom: async function () {
+					if(this.isLoading)
+						return;
+					this.isLoading = true;
+					this.sql_error = null;
+
+					let prompt = this.generateSchemaIDK(Object.keys(this.schema).filter(key => this.schema[key].selected));
+
+					const response = await fetch('https://api.openai.com/v1/completions',{
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json',
+							'Authorization': 'Bearer ' + this.key,
+
+						},
+						body: JSON.stringify({
+							temperature: parseFloat(this.temp),
+							model: 'text-davinci-003',
+							max_tokens: 300,
+							prompt: ``,
+							stop: ['\n\n'],
+							stream: false,
+						})
+					});
+
+					const data = await response.json();
+					this.isLoading = false;
+					if(!data.id) {
+						this.sql_error = JSON.stringify(data);
+						return;
+					}
+					this.query = data.choices[0].text;
+				},
+
+				generate: async function () {
+					if(this.query === '' || this.isLoading)
+						return;
+					this.isLoading = true;
+					this.sql_error = null;
+
+					const prompt = this.generateSchema(this.query, Object.keys(this.schema).filter(key => this.schema[key].selected));
+
+					const response = await fetch('https://api.openai.com/v1/completions',{
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json',
+							'Authorization': 'Bearer ' + this.key,
+
+						},
+						body: JSON.stringify({
+							temperature: this.temp,
+							model: 'text-davinci-003',
+							max_tokens: 300,
+							prompt,
+							stop: ['\n\n'],
+							stream: false,
+						})
+					});
+
+
+					const data = await response.json();
+					this.isLoading = false;
+					if(data.id) {
+						let res = data.choices[0].text.trimLeft().trimRight();
+						this.sql_query = res;
+						this.used_tokens = 0;
+						this.view = 'generate';
+					} else {
+						this.sql_error = data.error.message
+					}
+				},
+			}
+		});
+
+		let EventEmitter = (function () {
+
+			let elem = document.createElement("div")
+		
+			return {
+				on: function (name, cb) {
+					elem.addEventListener(name, (e) => cb(e.detail), false )
+				},
+				emit: function (name, data) {
+					elem.dispatchEvent(new CustomEvent(name, {detail: data}))
+				} 
+			}
+
+		})();
+
+		EventEmitter.on('inject_prompt', (data) => {
+			try {
+				app.in_schema = data || JSON.parse(data);
+				app.status = 'ready'
+			} catch (e) {
+				app.sql_error = e.message;
+			}
+		});
+		
+		EventEmitter.on('inject_driver', (data) => {
+			app.driver = data;
+		});
+
+		// For debug purposes only (test in normal browser)
+		setTimeout(() => {
+		//EventEmitter.emit('inject_prompt', { "users": [ { "name": "id", "type": "int4", "comment": "", "selected": true }, { "name": "username", "type": "text", "comment": "just a username", "selected": true }, { "name": "avatar", "type": "text", "comment": "", "selected": true }, { "name": "created_at", "type": "timestamptz", "comment": "", "selected": true }, { "name": "rating", "type": "float4", "comment": "", "selected": true }, { "name": "delivery_time_avg", "type": "float4", "comment": "", "selected": true }, { "name": "online_at", "type": "timestamptz", "comment": "", "selected": true }, { "name": "current_steam", "type": "text", "comment": "", "selected": true }, { "name": "inventory_cached", "type": "timestamptz", "comment": "", "selected": true } ], "items_prices": [ { "name": "marketHashName", "type": "text", "comment": "", "selected": true }, { "name": "steam", "type": "float4", "comment": "", "selected": true }, { "name": "updated_at", "type": "timestamp", "comment": "", "selected": true } ], "items_quality": [ { "name": "quality_id", "type": "int4", "comment": "", "selected": true }, { "name": "quality_title", "type": "text", "comment": "", "selected": true } ], "items_rarities": [ { "name": "rarity_id", "type": "int4", "comment": "", "selected": true }, { "name": "rarity_title", "type": "text", "comment": "", "selected": true } ], "items": [ { "name": "id", "type": "int4", "comment": "", "selected": true }, { "name": "stickers", "type": "json", "comment": "", "selected": true }, { "name": "paintSeed", "type": "int4", "comment": "", "selected": true }, { "name": "paintWear", "type": "float8", "comment": "", "selected": true }, { "name": "defIndex", "type": "int4", "comment": "", "selected": true }, { "name": "paintIndex", "type": "int4", "comment": "", "selected": true }, { "name": "rarityId", "type": "int4", "comment": "", "selected": true }, { "name": "originId", "type": "int4", "comment": "", "selected": true }, { "name": "qualityId", "type": "int4", "comment": "", "selected": true }, { "name": "isStattrak", "type": "bool", "comment": "", "selected": true }, { "name": "isSouvenir", "type": "bool", "comment": "", "selected": true }, { "name": "imageUrl", "type": "text", "comment": "", "selected": true }, { "name": "marketHashName", "type": "text", "comment": "", "selected": true }, { "name": "steamId", "type": "int8", "comment": "", "selected": true }, { "name": "globalRatingPos", "type": "int4", "comment": "", "selected": true }, { "name": "localRatingPos", "type": "int4", "comment": "", "selected": true }, { "name": "wearId", "type": "int4", "comment": "", "selected": true }, { "name": "itemdbId", "type": "int4", "comment": "", "selected": true } ], "items_origins": [ { "name": "origin_id", "type": "int4", "comment": "", "selected": true }, { "name": "origin_title", "type": "text", "comment": "", "selected": true } ], "users_rating": [ { "name": "user_id", "type": "int4", "comment": "", "selected": true }, { "name": "order_id", "type": "int4", "comment": "", "selected": true }, { "name": "is_success", "type": "bool", "comment": "", "selected": true }, { "name": "accept_time_diff", "type": "int4", "comment": "", "selected": true } ], "inventory": [ { "name": "user_id", "type": "int4", "comment": "", "selected": true }, { "name": "item_id", "type": "int4", "comment": "", "selected": true }, { "name": "steam_id", "type": "int8", "comment": "", "selected": true }, { "name": "asset_id", "type": "int8", "comment": "", "selected": true } ], "items_wear": [ { "name": "wear_id", "type": "int4", "comment": "", "selected": true }, { "name": "wear_title", "type": "text", "comment": "", "selected": true } ], "orders_response": [ { "name": "id", "type": "int4", "comment": "", "selected": true }, { "name": "order_id", "type": "int4", "comment": "", "selected": true }, { "name": "user_id", "type": "int4", "comment": "", "selected": true }, { "name": "item_id", "type": "int4", "comment": "", "selected": true }, { "name": "created_at", "type": "timestamptz", "comment": "", "selected": true }, { "name": "item_status", "type": "bool", "comment": "", "selected": true }, { "name": "item_amount", "type": "float4", "comment": "", "selected": true }, { "name": "item_type", "type": "text", "comment": "", "selected": true }, { "name": "money_taken", "type": "bool", "comment": "", "selected": true }, { "name": "money_refunded", "type": "bool", "comment": "", "selected": true }, { "name": "money_given", "type": "bool", "comment": "", "selected": true } ], "items_db": [ { "name": "id", "type": "int4", "comment": "", "selected": true }, { "name": "marketHashName", "type": "text", "comment": "test key", "selected": true }, { "name": "icon_url", "type": "text", "comment": "", "selected": true }, { "name": "color", "type": "text", "comment": "", "selected": true }, { "name": "stattrak", "type": "bool", "comment": "", "selected": true }, { "name": "souvenir", "type": "bool", "comment": "", "selected": true }, { "name": "name", "type": "text", "comment": "", "selected": true }, { "name": "skin", "type": "text", "comment": "", "selected": true }, { "name": "wear", "type": "text", "comment": "", "selected": true }, { "name": "type", "type": "text", "comment": "", "selected": true } ], "orders_request": [ { "name": "id", "type": "int4", "comment": "", "selected": true }, { "name": "order_id", "type": "int4", "comment": "", "selected": true }, { "name": "user_id", "type": "int4", "comment": "", "selected": true }, { "name": "item_name", "type": "text", "comment": "", "selected": true }, { "name": "quality", "type": "json", "comment": "", "selected": true }, { "name": "rarity", "type": "json", "comment": "", "selected": true }, { "name": "paintSeed", "type": "int4", "comment": "", "selected": true }, { "name": "paintWearRange", "type": "json", "comment": "", "selected": true }, { "name": "stickers", "type": "json", "comment": "", "selected": true }, { "name": "icon_url", "type": "text", "comment": "", "selected": true }, { "name": "steamPriceRange", "type": "json", "comment": "", "selected": true } ], "orders_items": [ { "name": "id", "type": "int4", "comment": "", "selected": true }, { "name": "order_id", "type": "int4", "comment": "", "selected": true }, { "name": "user_id", "type": "int4", "comment": "", "selected": true }, { "name": "item_id", "type": "int4", "comment": "", "selected": true }, { "name": "created_at", "type": "timestamptz", "comment": "", "selected": true } ], "orders": [ { "name": "id", "type": "int4", "comment": "", "selected": true }, { "name": "user_id", "type": "int4", "comment": "", "selected": true }, { "name": "created_at", "type": "timestamptz", "comment": "", "selected": true }, { "name": "comment", "type": "text", "comment": "", "selected": true }, { "name": "price_type", "type": "price_type", "comment": "", "selected": true }, { "name": "finished_at", "type": "timestamptz", "comment": "", "selected": true }, { "name": "steam_id", "type": "int8", "comment": "", "selected": true }, { "name": "second_user", "type": "int4", "comment": "", "selected": true }, { "name": "is_accepted", "type": "bool", "comment": "", "selected": true }, { "name": "offer_id", "type": "int8", "comment": "", "selected": true }, { "name": "offer_created_at", "type": "timestamptz", "comment": "", "selected": true }, { "name": "second_user_steam_id", "type": "int8", "comment": "", "selected": true }, { "name": "response_at", "type": "timestamptz", "comment": "", "selected": true } ], "users_cache": [ { "name": "steam_id", "type": "int8", "comment": "", "selected": true }, { "name": "cached_at", "type": "timestamptz", "comment": "", "selected": true }, { "name": "user_id", "type": "int4", "comment": "", "selected": true } ] })
+		}, 500);
+	</script>
+
+</body>
+
+</html>
