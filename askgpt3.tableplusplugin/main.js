@@ -15,7 +15,7 @@ var creation = function(context) {
         return;
     };
 
-    var workingPath = Application.pluginRootPath() + "/com.hormold.gptsqltalk.tableplusplugin/ui/index.html"
+    var workingPath = Application.pluginRootPath() + "/com.hormold.askgpt3.tableplusplugin/ui/index.html"
     var webView = context.loadFile(workingPath, null);
 
     // Disable menu context
