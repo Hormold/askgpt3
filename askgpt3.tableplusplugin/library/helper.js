@@ -50,6 +50,7 @@ function generateQuery(context, item, webView) {
       });
     }
     const data = JSON.stringify(groupByTable).replace(/'/g, "\\'");
+
     
     webView.evaluate("setTimeout( () => { EventEmitter.emit('inject_driver','"+driver+"');}, 600);");
     webView.evaluate("setTimeout( () => { EventEmitter.emit('inject_prompt', '"+data+"');}, 700);"); 

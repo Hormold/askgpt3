@@ -12,7 +12,8 @@
 	<!-- Custom CSS -->
 	<style>
 		.container {
-			margin-top: 10px;
+			margin-top: 0px;
+			width: 100%;
 		}
 		ul {
 			list-style-type: none;
@@ -21,10 +22,8 @@
 		input[type=checkbox] {
 			margin-right: 5px;
 		}
-		.fork-me {
-			position: absolute;
-			top: 0;
-			right: 0;
+		.panel-title-right	 {
+			float: right;
 		}
 	</style>
 	<!-- Vue -->
@@ -36,16 +35,19 @@
 		<div class="container">
 			<div class="row">
 
-				<div class="col-md-8 col-md-offset-2" v-if="view === 'setkey'">
+				<div class="col-8" v-if="view === 'setkey'">
 					<div class="panel panel-default">
 						<div class="panel-heading">
-							<h3 class="panel-title">Set OpenAI Token</h3>
+								&nbsp;
+								<div class="panel-title-right">
+									Set OpenAI Token
+								</div>
 						</div>
 						<div class="panel-body">
 							<div class="alert alert-warning" role="alert" v-if="sql_error">
 								<b>Error:</b> [[sql_error]]
 							</div>
-							<p>Please enter your OpenAI API token below and it will be saved to browser localStorage</p>
+							<p>Please enter your OpenAI API token below and it will be saved to localStorage</p>
 							<fieldset>
 								<div class="form-group">
 									<input class="form-control" v-model="key" placeholder="Enter OpenAI API token"
@@ -63,10 +65,15 @@
 					</div>
 				</div>
 
-				<div class="col-md-8 col-md-offset-2" v-if="view === 'index'">
+				<div class="col-8" v-if="view === 'index'">
 					<div class="panel panel-default">
 						<div class="panel-heading">
-							<h3 class="panel-title">GPT SQL Query: Configuation ([[ driver ]], [[status]])</h3>
+							<h3 class="panel-title">
+								&nbsp;
+								<div class="panel-title-right">
+									Configuation ([[ driver ]], [[status]])
+								</div>
+							</h3>
 						</div>
 						<div class="panel-body">
 							<div class="alert alert-warning" role="alert" v-if="sql_error">
@@ -86,13 +93,13 @@
 										v-model="temp" max="1" step="0.1" value="0.5">
 								</div>
 								<div v-if="!isLoading">
-									<div class="row">
-										<div class="col-md-6">
-											<input class="btn btn-lg btn-success btn-block" type="submit" value="Do Magic!" @click="generate">
+									<div class="col-12">
+										<div class="col-6">
+											<input class="btn btn-lg btn-success btn-block" type="submit" value="Generate SQL Query" @click="generate">
 										</div>
-										<div class="col-md-6">
+										<!--div class="col-6">
 											<input class="btn btn-lg btn-success btn-block" type="submit" value="I don't know what to ask" @click="generateRandom">
-										</div>
+										</div-->
 									</div>
 									
 								</div>
@@ -139,15 +146,16 @@
 					</div>
 				</div>
 
-				<div class="col-md-8 col-md-offset-2" v-if="view === 'generate'">
+				<div class="col-8" v-if="view === 'generate'">
 					<div class="panel panel-default">
 						<div class="panel-heading">
-							<div class="pull-right">
-								<button type="button" class="btn btn-default btn-sm" @click="view = 'index'">
-									<span class="glyphicon glyphicon-arrow-left"></span> Back
-								</button>
-							</div>
-							<h3 class="panel-title">Approve generate SQL query<br /><br /></h3>
+
+							<h3 class="panel-title">
+								&nbsp;
+								<div class="panel-title-right">
+									Generated SQL Query from GPT-3
+								</div>
+							</h3>
 							<!-- Back button -->
 							
 							
@@ -175,7 +183,7 @@
 												@click="generate">
 										</div>
 										<div class="col-md-6">
-											<input class="btn btn-lg btn-success btn-block" type="submit" value="Go back"
+											<input class="btn btn-lg btn-info btn-block" type="submit" value="Go back"
 												@click="view = 'index'">
 										</div>
 									</div>
@@ -212,7 +220,7 @@
 				in_schema: {},
 				sql_query: '',
 				view: 'index',
-				temp: 0.5,
+				temp: 0.3,
 				query: '',
 				column_names: [],
 				results: [],
@@ -238,6 +246,7 @@
 				in_schema: function (val) {
 					this.status = 'ready'
 					this.schema = val
+					this.inited();
 					// this.debug = val;
 				},
 			},
@@ -383,7 +392,7 @@ Schema: `;
 					if(data.id) {
 						let res = data.choices[0].text.trimLeft().trimRight();
 						this.sql_query = res;
-						this.used_tokens = 0;
+						this.used_tokens = data.usage.total_tokens;
 						this.view = 'generate';
 					} else {
 						this.sql_error = data.error.message
@@ -408,8 +417,9 @@ Schema: `;
 		})();
 
 		EventEmitter.on('inject_prompt', (data) => {
+			app.status = 'parsing'
 			try {
-				app.in_schema = data || JSON.parse(data);
+				app.in_schema = typeof data === "object"?data:JSON.parse(data);
 				app.status = 'ready'
 			} catch (e) {
 				app.sql_error = e.message;
@@ -418,12 +428,9 @@ Schema: `;
 		
 		EventEmitter.on('inject_driver', (data) => {
 			app.driver = data;
+			app.status = 'injecting'
 		});
 
-		// For debug purposes only (test in normal browser)
-		setTimeout(() => {
-		//EventEmitter.emit('inject_prompt', { "users": [ { "name": "id", "type": "int4", "comment": "", "selected": true }, { "name": "username", "type": "text", "comment": "just a username", "selected": true }, { "name": "avatar", "type": "text", "comment": "", "selected": true }, { "name": "created_at", "type": "timestamptz", "comment": "", "selected": true }, { "name": "rating", "type": "float4", "comment": "", "selected": true }, { "name": "delivery_time_avg", "type": "float4", "comment": "", "selected": true }, { "name": "online_at", "type": "timestamptz", "comment": "", "selected": true }, { "name": "current_steam", "type": "text", "comment": "", "selected": true }, { "name": "inventory_cached", "type": "timestamptz", "comment": "", "selected": true } ], "items_prices": [ { "name": "marketHashName", "type": "text", "comment": "", "selected": true }, { "name": "steam", "type": "float4", "comment": "", "selected": true }, { "name": "updated_at", "type": "timestamp", "comment": "", "selected": true } ], "items_quality": [ { "name": "quality_id", "type": "int4", "comment": "", "selected": true }, { "name": "quality_title", "type": "text", "comment": "", "selected": true } ], "items_rarities": [ { "name": "rarity_id", "type": "int4", "comment": "", "selected": true }, { "name": "rarity_title", "type": "text", "comment": "", "selected": true } ], "items": [ { "name": "id", "type": "int4", "comment": "", "selected": true }, { "name": "stickers", "type": "json", "comment": "", "selected": true }, { "name": "paintSeed", "type": "int4", "comment": "", "selected": true }, { "name": "paintWear", "type": "float8", "comment": "", "selected": true }, { "name": "defIndex", "type": "int4", "comment": "", "selected": true }, { "name": "paintIndex", "type": "int4", "comment": "", "selected": true }, { "name": "rarityId", "type": "int4", "comment": "", "selected": true }, { "name": "originId", "type": "int4", "comment": "", "selected": true }, { "name": "qualityId", "type": "int4", "comment": "", "selected": true }, { "name": "isStattrak", "type": "bool", "comment": "", "selected": true }, { "name": "isSouvenir", "type": "bool", "comment": "", "selected": true }, { "name": "imageUrl", "type": "text", "comment": "", "selected": true }, { "name": "marketHashName", "type": "text", "comment": "", "selected": true }, { "name": "steamId", "type": "int8", "comment": "", "selected": true }, { "name": "globalRatingPos", "type": "int4", "comment": "", "selected": true }, { "name": "localRatingPos", "type": "int4", "comment": "", "selected": true }, { "name": "wearId", "type": "int4", "comment": "", "selected": true }, { "name": "itemdbId", "type": "int4", "comment": "", "selected": true } ], "items_origins": [ { "name": "origin_id", "type": "int4", "comment": "", "selected": true }, { "name": "origin_title", "type": "text", "comment": "", "selected": true } ], "users_rating": [ { "name": "user_id", "type": "int4", "comment": "", "selected": true }, { "name": "order_id", "type": "int4", "comment": "", "selected": true }, { "name": "is_success", "type": "bool", "comment": "", "selected": true }, { "name": "accept_time_diff", "type": "int4", "comment": "", "selected": true } ], "inventory": [ { "name": "user_id", "type": "int4", "comment": "", "selected": true }, { "name": "item_id", "type": "int4", "comment": "", "selected": true }, { "name": "steam_id", "type": "int8", "comment": "", "selected": true }, { "name": "asset_id", "type": "int8", "comment": "", "selected": true } ], "items_wear": [ { "name": "wear_id", "type": "int4", "comment": "", "selected": true }, { "name": "wear_title", "type": "text", "comment": "", "selected": true } ], "orders_response": [ { "name": "id", "type": "int4", "comment": "", "selected": true }, { "name": "order_id", "type": "int4", "comment": "", "selected": true }, { "name": "user_id", "type": "int4", "comment": "", "selected": true }, { "name": "item_id", "type": "int4", "comment": "", "selected": true }, { "name": "created_at", "type": "timestamptz", "comment": "", "selected": true }, { "name": "item_status", "type": "bool", "comment": "", "selected": true }, { "name": "item_amount", "type": "float4", "comment": "", "selected": true }, { "name": "item_type", "type": "text", "comment": "", "selected": true }, { "name": "money_taken", "type": "bool", "comment": "", "selected": true }, { "name": "money_refunded", "type": "bool", "comment": "", "selected": true }, { "name": "money_given", "type": "bool", "comment": "", "selected": true } ], "items_db": [ { "name": "id", "type": "int4", "comment": "", "selected": true }, { "name": "marketHashName", "type": "text", "comment": "test key", "selected": true }, { "name": "icon_url", "type": "text", "comment": "", "selected": true }, { "name": "color", "type": "text", "comment": "", "selected": true }, { "name": "stattrak", "type": "bool", "comment": "", "selected": true }, { "name": "souvenir", "type": "bool", "comment": "", "selected": true }, { "name": "name", "type": "text", "comment": "", "selected": true }, { "name": "skin", "type": "text", "comment": "", "selected": true }, { "name": "wear", "type": "text", "comment": "", "selected": true }, { "name": "type", "type": "text", "comment": "", "selected": true } ], "orders_request": [ { "name": "id", "type": "int4", "comment": "", "selected": true }, { "name": "order_id", "type": "int4", "comment": "", "selected": true }, { "name": "user_id", "type": "int4", "comment": "", "selected": true }, { "name": "item_name", "type": "text", "comment": "", "selected": true }, { "name": "quality", "type": "json", "comment": "", "selected": true }, { "name": "rarity", "type": "json", "comment": "", "selected": true }, { "name": "paintSeed", "type": "int4", "comment": "", "selected": true }, { "name": "paintWearRange", "type": "json", "comment": "", "selected": true }, { "name": "stickers", "type": "json", "comment": "", "selected": true }, { "name": "icon_url", "type": "text", "comment": "", "selected": true }, { "name": "steamPriceRange", "type": "json", "comment": "", "selected": true } ], "orders_items": [ { "name": "id", "type": "int4", "comment": "", "selected": true }, { "name": "order_id", "type": "int4", "comment": "", "selected": true }, { "name": "user_id", "type": "int4", "comment": "", "selected": true }, { "name": "item_id", "type": "int4", "comment": "", "selected": true }, { "name": "created_at", "type": "timestamptz", "comment": "", "selected": true } ], "orders": [ { "name": "id", "type": "int4", "comment": "", "selected": true }, { "name": "user_id", "type": "int4", "comment": "", "selected": true }, { "name": "created_at", "type": "timestamptz", "comment": "", "selected": true }, { "name": "comment", "type": "text", "comment": "", "selected": true }, { "name": "price_type", "type": "price_type", "comment": "", "selected": true }, { "name": "finished_at", "type": "timestamptz", "comment": "", "selected": true }, { "name": "steam_id", "type": "int8", "comment": "", "selected": true }, { "name": "second_user", "type": "int4", "comment": "", "selected": true }, { "name": "is_accepted", "type": "bool", "comment": "", "selected": true }, { "name": "offer_id", "type": "int8", "comment": "", "selected": true }, { "name": "offer_created_at", "type": "timestamptz", "comment": "", "selected": true }, { "name": "second_user_steam_id", "type": "int8", "comment": "", "selected": true }, { "name": "response_at", "type": "timestamptz", "comment": "", "selected": true } ], "users_cache": [ { "name": "steam_id", "type": "int8", "comment": "", "selected": true }, { "name": "cached_at", "type": "timestamptz", "comment": "", "selected": true }, { "name": "user_id", "type": "int4", "comment": "", "selected": true } ] })
-		}, 500);
 	</script>
 
 </body>
