@@ -4,6 +4,8 @@ This is a TablePlus's Plugin, by install `askgpt3` you will have a menu `Ask GPT
 It has simple UI, you can ask GPT-3 anything you want, and it will generate a SQL script for you.
 UI is draft, I will improve it later (**you can help me if you want**). See my other project [gpt-sql-box](https://github.com/Hormold/gpt-sql-box).
 
+![screenshot](https://github.com/Hormold/askgpt3/blob/master/images/demo.jpeg?raw=true)
+
 # Install
 
 ### From release
