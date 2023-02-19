@@ -15,5 +15,8 @@
   },
   "keywords": [],
   "author": "https://github.com/Hormold",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "sql-formatter": "^2.3.1"
+  }
 }

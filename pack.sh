@@ -1,0 +1,1 @@
+zip -r plugin.zip askgpt3.tableplusplugin -x askgpt3.tableplusplugin/node_modules/**\* -x askgpt3.tableplusplugin/.git/**\* -x askgpt3.tableplusplugin/.DS_Store

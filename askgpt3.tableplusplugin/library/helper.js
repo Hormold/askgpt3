@@ -1,6 +1,18 @@
 "use strict";
+import sqlFormatter from "sql-formatter";
 
-function generateQuery(context, item, webView) {
+
+const formatSQL = function(string) {
+  var formatterStatement = sqlFormatter.format(string);
+  return formatterStatement;
+}
+
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function generateQuery(context, item, webView, cb) {
   let driver = context.driver();
   let query, query2;
   let comments = {};
@@ -58,17 +70,19 @@ function generateQuery(context, item, webView) {
         "Generator",
         "Ready to use"
     );
+    if(cb) cb();
   }
 
   if(query2) {
     context.execute(query2, res2 => {
       context.execute(query, res => {
-        processData(res.rows, res2.rows)
+        processData(res.rows, res2.rows);
+        
       });
     });
   } else {
     context.execute(query, res => {
-      processData(res.rows)
+      processData(res.rows);
     });
   }
 
@@ -78,5 +92,7 @@ function generateQuery(context, item, webView) {
 
 
 export {
-  generateQuery
+  generateQuery,
+  formatSQL,
+  sleep
 };

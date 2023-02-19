@@ -229,9 +229,8 @@
 				used_tokens: 0,
 				key: '',
 				sql_error: null,
-				chart_type: 'bar',
-				chart_data: [],
 
+				queryCopied: true,
 				debug: null,
 			},
 
@@ -359,6 +358,7 @@ Schema: `;
 						return;
 					}
 					this.query = data.choices[0].text;
+					this.queryCopied = false;
 				},
 
 				generate: async function () {
@@ -430,6 +430,14 @@ Schema: `;
 			app.driver = data;
 			app.status = 'injecting'
 		});
+
+		const getQueryToRun = () => {
+			if(!app.queryCopied) {
+				app.queryCopied = true;
+				return app.query;
+			}
+			return false;
+		};
 
 	</script>
 

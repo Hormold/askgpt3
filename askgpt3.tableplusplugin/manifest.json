@@ -16,7 +16,8 @@
             "location": "item",
             "type": "action",
             "script": "gpt.js",
-            "handler": "creation"
+            "handler": "creation",
+            "shortcut": "control+a"
         }
     ]
 }
